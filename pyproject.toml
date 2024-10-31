@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "pyeeg-toolbox"
 version = "0.1.0"
-description = "Toolbox to conduct analysisi of EEG signals."
+description = "Toolbox to read, write, create montages, apply dsp transforms and conduct analysis of EEG signals"
 authors = ["dlp <mossdet.detector@gmail.com>"]
 readme = "README.md"
 package-mode = true
