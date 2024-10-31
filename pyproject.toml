@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "pyeeg-toolbox"
+version = "0.1.0"
+description = "Toolbox to conduct analysisi of EEG signals."
+authors = ["dlp <mossdet.detector@gmail.com>"]
+readme = "README.md"
+package-mode = true
+
+[tool.poetry.dependencies]
+python = "^3.12"
+plotly = "^5.24.1"
+numpy = "^2.1.1"
+scikit-learn = "^1.5.2"
+seaborn = "^0.13.2"
+edflib-python = "^1.0.8"
+edfio = "^0.4.4"
+mne = "^1.8.0"
+dash = "^2.18.1"
+kaleido = "0.1.0"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
