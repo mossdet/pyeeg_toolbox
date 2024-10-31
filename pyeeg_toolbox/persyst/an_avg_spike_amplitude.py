@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Dict
 from pyeeg_toolbox.persyst.spike_cumulator import SpikeCumulator
 from pyeeg_toolbox.eeg_io.eeg_io import EEG_IO
-from pyeeg_toolbox.studies.studies_info import StudiesInfo
 from scipy.signal import find_peaks, peak_prominences
+from studies_info import StudiesInfo
 
 class SpikeAmplitudeAnalyzer:
     """

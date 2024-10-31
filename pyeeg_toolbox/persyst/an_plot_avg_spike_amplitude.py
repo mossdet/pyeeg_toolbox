@@ -7,8 +7,9 @@ from collections import defaultdict
 from PIL import Image
 from pathlib import Path
 from pyeeg_toolbox.persyst.an_avg_spike_amplitude import SpikeAmplitudeAnalyzer
-from pyeeg_toolbox.studies.studies_info import StudiesInfo
 from sklearn.preprocessing import MinMaxScaler
+from studies_info import StudiesInfo
+
 
 FIGSIZE = (16, 8)
 STAGES_COLORS = {'N1':(250,223,99), 'N2':(41,232,178), 'N3':(76,169,238), 'REM':(47,69,113), 'Wake':(224,115,120), 'Unknown':(128,128,128)}
