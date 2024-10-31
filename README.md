@@ -1,2 +1,2 @@
-# Toolbox to conduct analysisi of EEG signals
+# Toolbox to read, write, create montages and condct analysis of EEG signals
 
