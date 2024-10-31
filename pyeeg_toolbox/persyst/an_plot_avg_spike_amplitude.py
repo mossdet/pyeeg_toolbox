@@ -25,7 +25,8 @@ def plot_sleep_stage_durations(study_info, spike_cumulators_path):
 
     wedgeprops = {"edgecolor" : "black", 'linewidth': 0.5, 'antialiased': True}
 
-    sleep_ref_img= Image.open("C:/Users/HFO/Documents/Persyst_Project/Persyst_Spike_Detection_Project/reveal_spikes_analyzer/data_analysis/batch_processing/SleepStages_Reference.png")
+    sleep_ref_img_path = os.getcwd()+'/pyeeg_toolbox/persyst/SleepStages_Reference.png'
+    sleep_ref_img= Image.open(sleep_ref_img_path)
     rsz_ratio = 4
     img_rsz = (int(sleep_ref_img.size[0]/rsz_ratio), int(sleep_ref_img.size[1]/rsz_ratio))
     sleep_ref_img = sleep_ref_img.resize(img_rsz)
