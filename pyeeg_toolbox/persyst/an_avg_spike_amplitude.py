@@ -435,7 +435,7 @@ if __name__ == '__main__':
 
         print(pat_id)
 
-        pat_data_path = study.eeg_data_path / pat_id
+        pat_data_path = study_info.eeg_data_path / pat_id
         spike_amplitude_analyzer = SpikeAmplitudeAnalyzer(pat_id=pat_id, ieeg_data_path=pat_data_path)
 
         spike_amplitude_analyzer.run(file_extension='.lay', mtg_t='ir', plot_ok=False)
