@@ -8,20 +8,17 @@ from PIL import Image
 from pathlib import Path
 from pyeeg_toolbox.persyst.an_avg_spike_amplitude import SpikeAmplitudeAnalyzer
 from sklearn.preprocessing import MinMaxScaler
-from studies_info import StudiesInfo
+from studies_info import fr_four_patients
 
 
 FIGSIZE = (16, 8)
 STAGES_COLORS = {'N1':(250,223,99), 'N2':(41,232,178), 'N3':(76,169,238), 'REM':(47,69,113), 'Wake':(224,115,120), 'Unknown':(128,128,128)}
 
 
-def plot_sleep_stage_durations(spike_cumulators_path):
-
-    study = StudiesInfo()
-    study.fr_four_init()
+def plot_sleep_stage_durations(study_info, spike_cumulators_path):
     
     plt.style.use('seaborn-v0_8-darkgrid')
-    nr_pats = len(study.study_patients.keys())
+    nr_pats = len(study_info.patients.keys())
     fig, axs = plt.subplots(2, nr_pats, figsize=FIGSIZE)
     plt.get_current_fig_manager().full_screen_toggle()
     plt.suptitle(f"Sleep-Stage Duration by Patient")
@@ -33,10 +30,10 @@ def plot_sleep_stage_durations(spike_cumulators_path):
     img_rsz = (int(sleep_ref_img.size[0]/rsz_ratio), int(sleep_ref_img.size[1]/rsz_ratio))
     sleep_ref_img = sleep_ref_img.resize(img_rsz)
 
-    for pidx, pat_id in enumerate(study.study_patients.keys()):
+    for pidx, pat_id in enumerate(study_info.patients.keys()):
 
         print(pat_id)
-        pat_data_path = study.eeg_data_path / pat_id
+        pat_data_path = study_info.eeg_data_path / pat_id
         spike_amplitude_analyzer = SpikeAmplitudeAnalyzer(pat_id=pat_id, ieeg_data_path=pat_data_path)
         spike_amplitude_analyzer.get_files_in_folder(file_extension='.lay')
 
@@ -77,19 +74,16 @@ def plot_sleep_stage_durations(spike_cumulators_path):
     plt.waitforbuttonpress()
     plt.close()
 
-def plot_avg_spike_rate_per_stage_per_patient(spike_cumulators_path):
+def plot_avg_spike_rate_per_stage_per_patient(study_info, spike_cumulators_path):
 
-    study = StudiesInfo()
-    study.fr_four_init()
-    to_plot_stage_names = ['N3', 'N2', 'N1', 'REM', 'Wake', 'Unknown']
-    
+    to_plot_stage_names = ['N3', 'N2', 'N1', 'REM', 'Wake', 'Unknown']    
     plt.style.use('seaborn-v0_8-darkgrid')
-    fig, axs = plt.subplots(1, len(study.study_patients.keys()), figsize=FIGSIZE)
+    fig, axs = plt.subplots(1, len(study_info.patients.keys()), figsize=FIGSIZE)
 
-    for pat_idx, pat_id in enumerate(study.study_patients.keys()):
+    for pat_idx, pat_id in enumerate(study_info.patients.keys()):
 
         print(pat_id)
-        pat_data_path = study.eeg_data_path / pat_id
+        pat_data_path = study_info.eeg_data_path / pat_id
         spike_cumulator_fn = spike_cumulators_path / f"{pat_id}_SpikeCumulator.pickle"
         spike_amplitude_analyzer = SpikeAmplitudeAnalyzer(pat_id=pat_id, ieeg_data_path=pat_data_path)
         spike_amplitude_analyzer.get_files_in_folder(file_extension='.lay')
@@ -121,21 +115,18 @@ def plot_avg_spike_rate_per_stage_per_patient(spike_cumulators_path):
     plt.waitforbuttonpress()
     plt.close() 
 
-def plot_avg_spike_waveform_per_stage_per_patient(spike_cumulators_path):
+def plot_avg_spike_waveform_per_stage_per_patient(study_info, spike_cumulators_path):
 
-    study = StudiesInfo()
-    study.fr_four_init()
     to_plot_stage_names = ['N3', 'N2', 'N1', 'REM', 'Wake', 'Unknown']
-
     plt.style.use('seaborn-v0_8-darkgrid')
-    sp_nr_rows = len(study.study_patients.keys())
+    sp_nr_rows = len(study_info.patients.keys())
     sp_nr_cols = len(to_plot_stage_names)
     fig, axs = plt.subplots(sp_nr_rows, sp_nr_cols, figsize=FIGSIZE)
 
-    for pat_idx, pat_id in enumerate(study.study_patients.keys()):
+    for pat_idx, pat_id in enumerate(study_info.patients.keys()):
 
         print(pat_id)
-        pat_data_path = study.eeg_data_path / pat_id
+        pat_data_path = study_info.eeg_data_path / pat_id
         spike_cumulator_fn = spike_cumulators_path / f"{pat_id}_SpikeCumulator.pickle"
         spike_amplitude_analyzer = SpikeAmplitudeAnalyzer(pat_id=pat_id, ieeg_data_path=pat_data_path)
         spike_amplitude_analyzer.get_files_in_folder(file_extension='.lay')
@@ -200,7 +191,7 @@ def plot_avg_spike_waveform_per_stage_per_patient(spike_cumulators_path):
     plt.waitforbuttonpress()
     plt.close()
 
-    pat_data_path = study.eeg_data_path / pat_id
+    pat_data_path = study_info.eeg_data_path / pat_id
 
 def get_scaled_stage_avg_spike(spike_cumulator):
 
@@ -238,20 +229,18 @@ def get_scaled_stage_avg_spike(spike_cumulator):
     return stages_ch_avg_spike
 
 
-def plot_chscaled_avg_spike_waveform_per_stage_per_patient(spike_cumulators_path):
-    study = StudiesInfo()
-    study.fr_four_init()
-    to_plot_stage_names = ['N3', 'N2', 'N1', 'REM', 'Wake', 'Unknown']
-    
+def plot_chscaled_avg_spike_waveform_per_stage_per_patient(study_info, spike_cumulators_path):
+
+    to_plot_stage_names = ['N3', 'N2', 'N1', 'REM', 'Wake', 'Unknown']    
     plt.style.use('seaborn-v0_8-darkgrid')
-    sp_nr_rows = len(study.study_patients.keys())
+    sp_nr_rows = len(study_info.patients.keys())
     sp_nr_cols = len(to_plot_stage_names)
     fig, axs = plt.subplots(sp_nr_rows, sp_nr_cols, figsize=FIGSIZE)
 
-    for pat_idx, pat_id in enumerate(study.study_patients.keys()):
+    for pat_idx, pat_id in enumerate(study_info.patients.keys()):
 
         print(pat_id)
-        pat_data_path = study.eeg_data_path / pat_id
+        pat_data_path = study_info.eeg_data_path / pat_id
         spike_cumulator_fn = spike_cumulators_path / f"{pat_id}_SpikeCumulator.pickle"
 
 

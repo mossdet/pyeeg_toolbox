@@ -9,7 +9,7 @@ from typing import Dict
 from pyeeg_toolbox.persyst.spike_cumulator import SpikeCumulator
 from pyeeg_toolbox.eeg_io.eeg_io import EEG_IO
 from scipy.signal import find_peaks, peak_prominences
-from studies_info import StudiesInfo
+from studies_info import fr_four_patients
 
 class SpikeAmplitudeAnalyzer:
     """
@@ -429,10 +429,9 @@ if __name__ == '__main__':
     output_path = Path(os.getcwd()) / "Output"
     os.makedirs(output_path, exist_ok=True)
 
-    study = StudiesInfo()
-    study.fr_four_init()
+    study_info = fr_four_patients()
 
-    for pat_id in study.study_patients.keys():
+    for pat_id in study_info.patients.keys():
 
         print(pat_id)
 
