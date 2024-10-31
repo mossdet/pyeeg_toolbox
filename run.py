@@ -15,14 +15,14 @@ os.makedirs(output_path, exist_ok=True)
 
 study_info = fr_four_patients()
 
-#Obtain average spike for each sleep stage and each patient
-for pat_id in study_info.patients.keys():
-    print(pat_id)
-    pat_data_path = study_info.eeg_data_path / pat_id
-    spike_amplitude_analyzer = SpikeAmplitudeAnalyzer(pat_id=pat_id, ieeg_data_path=pat_data_path)
-    spike_amplitude_analyzer.run(file_extension='.lay', mtg_t='ir', plot_ok=False)
-    spike_cumulator_fn = output_path / f"{pat_id}_SpikeCumulator.pickle"
-    spike_amplitude_analyzer.save_spike_cumulator(filepath=spike_cumulator_fn)
+# #Obtain average spike for each sleep stage and each patient
+# for pat_id in study_info.patients.keys():
+#     print(pat_id)
+#     pat_data_path = study_info.eeg_data_path / pat_id
+#     spike_amplitude_analyzer = SpikeAmplitudeAnalyzer(pat_id=pat_id, ieeg_data_path=pat_data_path)
+#     spike_amplitude_analyzer.run(file_extension='.lay', mtg_t='ir', plot_ok=False)
+#     spike_cumulator_fn = output_path / f"{pat_id}_SpikeCumulator.pickle"
+#     spike_amplitude_analyzer.save_spike_cumulator(filepath=spike_cumulator_fn)
 
 # Define directory to save the cumulated spike signals
 
