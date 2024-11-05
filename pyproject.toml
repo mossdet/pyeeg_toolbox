@@ -17,6 +17,7 @@ edfio = "^0.4.4"
 mne = "^1.8.0"
 dash = "^2.18.1"
 kaleido = "0.1.0"
+pyqt6 = "^6.7.1"
 
 
 [tool.poetry.group.dev.dependencies]

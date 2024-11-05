@@ -63,7 +63,11 @@ class SpikeAmplitudeAnalyzer:
 
         Parameters:
         file_extension (str): The file extension to filter for. Default is '.lay'.
-        mtg_t (str): The montage type to use for EEG data reading. Default is 'ir'.
+        mtg_t (str): The montage type to use for EEG data reading. Default is 'ir'. Options:
+            'sr' = Scalp Referential
+            'sb' = Scalp Bipolar
+            'ir' = Intracranial Referential
+            'ib' = Intracranial Bipolar
         plot_ok (bool): A flag indicating whether to plot the EEG segments containing spikes. Default is False.
 
         Returns:
@@ -137,6 +141,7 @@ class SpikeAmplitudeAnalyzer:
         """
         Returns the amplitude and frequency of the spike signal.
         """
+        spike_sig *= 1000 # transform to mV 
         reduced_wdw_dur_s = 0.2
         reduced_spike_sig = spike_sig[int(fs*reduced_wdw_dur_s):int(-reduced_wdw_dur_s*fs)]
         inv_red_spike_sig = reduced_spike_sig*-1
@@ -146,12 +151,15 @@ class SpikeAmplitudeAnalyzer:
         if len(all_proms) == 0:
             return np.nan, np.nan
 
-        min_prom_th = np.max(all_proms)*0.1
+        min_prom_th = np.max(all_proms)*0.3
         relev_peaks, _  = find_peaks(inv_red_spike_sig, prominence=min_prom_th)
         relev_peaks = np.sort(relev_peaks)
 
         reduced_spike_mid = int(len(reduced_spike_sig)/2)
         lpks = relev_peaks[(reduced_spike_mid - np.array(relev_peaks))>0]
+        rpks = relev_peaks[(reduced_spike_mid - np.array(relev_peaks))<0]
+
+        # Keep looking for spike in the left side of the spike peak
         if len(lpks) == 0:
             temp_prom_th = min_prom_th
             for _ in range(5):
@@ -162,7 +170,7 @@ class SpikeAmplitudeAnalyzer:
                 if len(lpks) > 0:
                     break
 
-        rpks = relev_peaks[(reduced_spike_mid - np.array(relev_peaks))<0]
+        # Keep looking for spike in the right side of the spike peak
         if len(rpks) == 0:
             temp_prom_th = min_prom_th
             for _ in range(5):
@@ -179,7 +187,8 @@ class SpikeAmplitudeAnalyzer:
             red_spike_start = lpks[len(lpks)-1]
         
         if len(rpks) > 0:
-            red_spike_end = rpks[len(rpks)-1]
+            #red_spike_end = rpks[len(rpks)-1]
+            red_spike_end = rpks[0]
                 
         ampl = np.max(reduced_spike_sig[red_spike_start:red_spike_end+1])-np.min(reduced_spike_sig[red_spike_start:red_spike_end+1])
         dur_s = (red_spike_end-red_spike_start+1)/fs
@@ -193,6 +202,8 @@ class SpikeAmplitudeAnalyzer:
             plt.plot(time_vec, spike_sig, '-k', linewidth=1)
             plt.plot([np.mean(time_vec)]*2, [np.min(spike_sig), np.max(spike_sig)], '--r', linewidth=1)
             plt.xlim(np.min(time_vec), np.max(time_vec))
+            plt.ylabel("Amplitude(mV)")
+            plt.xlabel("Time(s)")
             plt.title("Spike Wdw")
 
             plt.subplot(1, 4, 2)
@@ -211,21 +222,26 @@ class SpikeAmplitudeAnalyzer:
             plt.plot(np.zeros_like(inv_red_spike_sig)+mean_ampl, "--", color="gray")
             plt.title("Inverted Reduced Spike Wdw\nDetected Peaks")
 
-            plt.subplot(1, 4, 4)
+            ax = plt.subplot(1, 4, 4)
             time_vec = reduced_wdw_dur_s + np.arange(len(reduced_spike_sig))/fs
             plt.plot(time_vec, reduced_spike_sig, '-k', linewidth=1)
             plt.plot(time_vec[relev_peaks], reduced_spike_sig[relev_peaks], "x")
             plt.plot(time_vec[[reduced_spike_mid]*2], [reduced_spike_sig[reduced_spike_mid], reduced_spike_sig[reduced_spike_mid]-ampl], '-m')
+            plt.plot([time_vec[red_spike_start],time_vec[red_spike_end]] , [reduced_spike_sig[red_spike_start],reduced_spike_sig[red_spike_end]], 'xr')
             plt.plot([time_vec[red_spike_start],time_vec[red_spike_end]] , [reduced_spike_sig[reduced_spike_mid]]*2, '-m')
             plt.plot([time_vec[red_spike_start],time_vec[red_spike_end]] , [reduced_spike_sig[reduced_spike_mid]-ampl]*2, '-m')
             plt.xlim(np.min(time_vec), np.max(time_vec))
             plt.title("Reduced Spike Wdw\nDetected Peaks")
 
+            text_str = f'Amp-PtP:{ampl:.3f}mV\n Freq:{freq:.1f}Hz'
+            ax.text(0.70, 0.95, text_str, transform=ax.transAxes, fontsize=12, va='top', ha='left')
 
             # plt.suptitle(f"PatientID {this_pat_eeg_file_path.name}\n SpikeNr:{spike_idx+1}/{len(spike_data_df)}\nSpikeCh:{spike_eeg_ch_name}, SleepStage:{spike_sleep_stage_name}, Polarity: {spike_polarity}")
             # Display plot and wait for user input.
+            #plt.get_current_fig_manager().full_screen_toggle()
             plt.waitforbuttonpress()
             plt.close()
+            pass
 
         return ampl, freq
 
@@ -328,7 +344,7 @@ class SpikeAmplitudeAnalyzer:
                 fs_us = self.spike_cumulator.get_undersampling_frequency()
                 spike_wdw_us = self.undersample_signal(spike_wdw, fs_us)
 
-                spike_feats=self.get_spike_features(spike_wdw_us, fs_us, plot_ok)
+                spike_feats=self.get_spike_features(spike_wdw_us, fs_us, True)
                 spike_ampl = spike_feats[0]
                 spike_freq= spike_feats[1]
                 if np.isnan(spike_feats[0]):

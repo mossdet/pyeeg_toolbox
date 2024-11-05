@@ -26,18 +26,21 @@ def fr_four_patients():
         study_info.eeg_data_path = Path("F:/FREIBURG_Simultaneous_OneHrFiles/")
         study_info.sleep_data_path = study_info.eeg_data_path
         study_info.ispikes_data_path = study_info.eeg_data_path
+        study_info.channel_coordinates_data_path = study_info.eeg_data_path / "iEEG_Electrode_Coordinates"
     elif sys_info['hostname']=="DLP" and sys_info['machine']=="AMD64" and sys_info['system']=="Windows": 
         study_info.eeg_data_path = Path("F:/FREIBURG_Simultaneous_OneHrFiles/")
         study_info.sleep_data_path = study_info.eeg_data_path
         study_info.ispikes_data_path = study_info.eeg_data_path
+        study_info.channel_coordinates_data_path = study_info.eeg_data_path / "iEEG_Electrode_Coordinates"
     elif sys_info['hostname']=="dlp" and sys_info['machine']=="x86_64" and sys_info['system']=="Linux":
         study_info.eeg_data_path = Path("/media/dlp/Extreme Pro/FREIBURG_Simultaneous_OneHrFiles/")
         study_info.sleep_data_path = study_info.eeg_data_path
         study_info.ispikes_data_path = study_info.eeg_data_path
+        study_info.channel_coordinates_data_path = study_info.eeg_data_path / "iEEG_Electrode_Coordinates"
     
     # Define the names of the folders in the data_path directory that contain the files from each patient. Define also the list of bad channels  
     study_info.patients = {
-        'pat_FR_253':['HRC5', 'HP1', 'HP2', 'HP3'], 
+        'pat_FR_253':['HRC5', 'HP1', 'HP2', 'HP3'],
         'pat_FR_970':['GC1'], 
         'pat_FR_1084':['M1', 'M2'], 
         'pat_FR_1096':['LDH1'],
