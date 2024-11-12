@@ -3,10 +3,14 @@ import pandas as pd
 from pathlib import Path
 from joblib import Parallel, delayed
 from pyeeg_toolbox.persyst.an_avg_spike_amplitude import SpikeAmplitudeAnalyzer
+<<<<<<< HEAD
 from pyeeg_toolbox.persyst.an_avg_wdw_amplitude import AverageWdwAnalyzer
 from studies_info import fr_four_patients
 import pyeeg_toolbox.persyst.an_plot_avg_wdw_amplitude as wdw_plt
 import pyeeg_toolbox.persyst.an_plot_avg_spike_amplitude as spk_plt
+=======
+from studies_info import fr_four_patients
+>>>>>>> ef9cceb7e27e921aa877abce91e986bb4b8c1a62
 from pyeeg_toolbox.persyst.an_plot_avg_spike_amplitude import(
     plot_sleep_stage_durations,
     plot_avg_spike_waveform_per_stage_per_patient_single_axis,
@@ -30,6 +34,7 @@ def analyze_patient_spikes(study_info, pat_id):
     spike_cumulator_fn = output_path / f"{pat_id}_SpikeCumulator.pickle"
     spike_amplitude_analyzer.save_spike_cumulator(filepath=spike_cumulator_fn)
 
+<<<<<<< HEAD
 def analyze_patient_windows(study_info, pat_id):
     print(pat_id)
     pat_data_path = study_info.eeg_data_path / pat_id
@@ -46,6 +51,16 @@ def plots_spike_avg_data(study_info, output_path):
     # spk_plt.plot_avg_spike_waveform_per_stage_per_patient_single_axis(study_info, output_path)
     # spk_plt.plot_chscaled_avg_spike_waveform_per_stage_per_patient(study_info, output_path)
     spk_plt.plot_avg_spike_amplitude_3D(study_info, output_path)
+=======
+def analyze_data(study_info, output_path):
+    # os.makedirs(f"{output_path}/Images/", exist_ok=True)
+    # plot_sleep_stage_durations(study_info, output_path)
+    # plot_avg_spike_rate_per_stage_per_patient(study_info, output_path)
+    # plot_avg_spike_waveform_per_stage_per_patient(study_info, output_path)
+    # plot_avg_spike_waveform_per_stage_per_patient_single_axis(study_info, output_path)
+    #plot_chscaled_avg_spike_waveform_per_stage_per_patient(study_info, output_path)
+    plot_avg_spike_amplitude_3D(study_info, output_path)
+>>>>>>> ef9cceb7e27e921aa877abce91e986bb4b8c1a62
 
 def plots_wdw_avg_data(study_info, output_path):
     os.makedirs(f"{output_path}/Images/", exist_ok=True)
@@ -54,8 +69,12 @@ def plots_wdw_avg_data(study_info, output_path):
     wdw_plt.plot_avg_wdw_amplitude_3D(study_info, output_path)
 
 # Process Data, get avg spike per channel and spike features (amplitude and frequency)
+<<<<<<< HEAD
 #results = Parallel(n_jobs=1)(delayed(analyze_patient_spikes)(study_info, pat_id) for pat_id in study_info.patients.keys())
 #plots_spike_avg_data(study_info, output_path)
+=======
+results = Parallel(n_jobs=1)(delayed(analyze_patient)(study_info, pat_id) for pat_id in study_info.patients.keys())
+>>>>>>> ef9cceb7e27e921aa877abce91e986bb4b8c1a62
 
 
 output_path = Path(os.getcwd()) / "Wdw_Output"
