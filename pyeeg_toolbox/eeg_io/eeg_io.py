@@ -89,6 +89,7 @@ class EEG_IO:
         self.units = self.eeg_hdr._orig_units
         self.time_s = self.eeg_hdr.times
         self.n_samples = self.eeg_hdr.n_times
+        self.meas_date = self.eeg_hdr.info['meas_date']
 
         # if mne raw reader doesn't read the original units, set default units to uV
         if len(self.units) == 0:
@@ -133,9 +134,18 @@ class EEG_IO:
         for chi, ch_name in enumerate(ch_names):
             # Clean channel names from empty spaces and the '-Ref string'
             ch_name = ch_name.lstrip(" ").replace('-Ref', '')
+
             # Clean channel names from leading zeros'
-            alpha_str = ''.join([c for c in ch_name if c.isalpha()])
-            dig_str = str(int(''.join([c for c in ch_name if c.isdigit()])))
+            alpha_char_ls = [c for c in ch_name if c.isalpha()]
+            alpha_str = ''
+            if len(alpha_char_ls) > 0:
+                alpha_str = ''.join(alpha_char_ls)
+
+            dig_char_ls = [c for c in ch_name if c.isdigit()]
+            dig_str = ''
+            if len(dig_char_ls) >0:
+                dig_str = str(int(''.join(dig_char_ls)))
+
             ch_name = alpha_str + dig_str
             ch_names[chi] = ch_name
         return ch_names
@@ -201,7 +211,6 @@ class EEG_IO:
                 continue
             mtg_labels_ls.append(bip_mtg)
             mtg_chs_indices_ls.append((ch_1_idx, ch_2_idx))
-        mtg_labels_ls = self.clean_channel_labels(mtg_labels_ls)
         return mtg_labels_ls, mtg_chs_indices_ls
 
     
@@ -268,7 +277,6 @@ class EEG_IO:
                     mtg_name = f"{chname_a}-{chname_b}"
                     mtg_labels_ls.append(mtg_name)
                     mtg_chs_indices_ls.append((chidx_a, chidx_b))
-        mtg_labels_ls = self.clean_channel_labels(mtg_labels_ls)
         return mtg_labels_ls, mtg_chs_indices_ls
 
     

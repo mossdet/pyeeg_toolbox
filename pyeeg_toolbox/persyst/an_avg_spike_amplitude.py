@@ -261,8 +261,7 @@ class SpikeAmplitudeAnalyzer:
             assert len(self.pat_files_ls) > 0, f"No files found in folder {self.ieeg_data_path}"
 
             all_files_ch_names_ls = []
-            for record_idx in np.arange(start=0, stop=len(self.pat_files_ls)):
-                this_pat_eeg_file_path = self.pat_files_ls[record_idx]
+            for record_idx,this_pat_eeg_file_path in enumerate(self.pat_files_ls):
                 eeg_reader = EEG_IO(eeg_filepath=this_pat_eeg_file_path, mtg_t=mtg_t)
                 all_files_ch_names_ls.extend(eeg_reader.ch_names)
                 pass
@@ -345,7 +344,8 @@ class SpikeAmplitudeAnalyzer:
                 fs_us = self.spike_cumulator.get_undersampling_frequency()
                 spike_wdw_us = self.undersample_signal(spike_wdw, fs_us)
 
-                spike_feats=self.get_spike_features(spike_wdw_us, fs_us, True)
+                #spike_feats=self.get_spike_features(spike_wdw_us, fs_us, True)
+                spike_feats = (0,0)
                 spike_ampl = spike_feats[0]
                 spike_freq= spike_feats[1]
                 if np.isnan(spike_feats[0]):
@@ -355,17 +355,24 @@ class SpikeAmplitudeAnalyzer:
 
                 if plot_ok or np.isnan(spike_feats[0]):
                     plt.figure(figsize=(10,6))
-                    plt.subplot(1, 2, 1)
+                    plt.subplot(1, 3, 1)
                     time_vec = spike_wdw_start_sec+np.arange(len(spike_wdw))/eeg_reader.fs
                     plt.plot(time_vec, spike_wdw, '-k', linewidth=1)
                     plt.plot([np.mean(time_vec)]*2, [np.min(spike_wdw), np.max(spike_wdw)], '--r', linewidth=1)
                     plt.xlim(np.min(time_vec), np.max(time_vec))
 
-                    plt.subplot(1, 2, 2)
+                    plt.subplot(1, 3, 2)
                     time_vec = spike_wdw_start_sec+np.arange(len(spike_wdw_us))/fs_us
                     plt.plot(time_vec, spike_wdw_us, '-k', linewidth=1)
                     plt.plot([np.mean(time_vec)]*2, [np.min(spike_wdw_us), np.max(spike_wdw_us)], '--r', linewidth=1)
-                    plt.xlim(np.min(time_vec), np.max(time_vec))    
+                    plt.xlim(np.min(time_vec), np.max(time_vec))
+
+                    plt.subplot(1, 3, 3)
+                    abs_spike_wdw_us = np.abs(spike_wdw_us)
+                    time_vec = spike_wdw_start_sec+np.arange(len(spike_wdw_us))/fs_us
+                    plt.plot(time_vec, abs_spike_wdw_us, '-k', linewidth=1)
+                    plt.plot([np.mean(time_vec)]*2, [np.min(abs_spike_wdw_us), np.max(abs_spike_wdw_us)], '--r', linewidth=1)
+                    plt.xlim(np.min(time_vec), np.max(time_vec)) 
 
                     plt.suptitle(f"PatientID {this_pat_eeg_file_path.name}\n SpikeNr:{spike_idx+1}/{len(spike_data_df)}\nSpikeCh:{spike_eeg_ch_name}, SleepStage:{spike_sleep_stage_name}, Polarity: {spike_polarity}")
 
@@ -421,6 +428,7 @@ class SpikeAmplitudeAnalyzer:
         None
         """
         if self.spike_cumulator is not None:
+            os.makedirs(filepath.parent, exist_ok=True)
             with open(filepath, 'wb') as handle:
                 pickle.dump(self.spike_cumulator, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
