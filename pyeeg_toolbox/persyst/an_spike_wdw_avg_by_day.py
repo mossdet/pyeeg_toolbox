@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import matplotlib.pyplot as plt
+import sys
 
 from joblib import Parallel, delayed
 from pathlib import Path
@@ -17,6 +18,10 @@ from scipy.signal import find_peaks, peak_prominences
 from studies_info import fr_four_patients
 from pyeeg_toolbox.persyst.an_avg_spike_amplitude import SpikeAmplitudeAnalyzer
 from pyeeg_toolbox.utils.convert_mapped_channels import correct_1096_chnames
+
+# Workaround for Kaleido on Windows, without this the Kaleido executable is not found when saving as .png or .jpg
+if sys.platform.startswith('win'):
+	os.environ["PATH"] = os.environ["PATH"] + "C:\\Users\\HFO\\Development\\pyeeg_toolbox\\.venv\\Lib\\site-packages\\kaleido\\executable"
 
 class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
     """
@@ -104,7 +109,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
         for day_nr in eeg_filepaths_byday_df.EEG_Day.unique().tolist():
             day_eeg_files_ls = eeg_filepaths_byday_df.EEG_Filepath[eeg_filepaths_byday_df.EEG_Day==day_nr].values.tolist()
             assert len(day_eeg_files_ls) > 0, f"No files found in folder {self.ieeg_data_path} for day {day_nr}"
-            Parallel(n_jobs=1)(delayed(self.get_channel_avg_wdw_vectorized)(this_eeg_fpath, mtg_t, force_recalc) for this_eeg_fpath in day_eeg_files_ls)
+            Parallel(n_jobs=3)(delayed(self.get_channel_avg_wdw_vectorized)(this_eeg_fpath, mtg_t, force_recalc) for this_eeg_fpath in day_eeg_files_ls)
 
         avg_spike_by_day_stage_ch_df = self.get_avg_wdw_by_day_by_ch(eeg_filepaths_byday_df, mtg_t, force_recalc)
         avg_spike_by_day_stage_ch_df = self.get_channel_coordinates(avg_spike_by_day_stage_ch_df)
@@ -326,7 +331,10 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
             spk_cum = self.load_spike_cumulator(spike_cumulator_fpath)
             for sleep_stage in sleep_stages_ls:
                 spk_cntr[sleep_stage][0] += spk_cum.spike_counter[sleep_stage][0]
-
+        for sleep_stage in sleep_stages_ls:
+            if spk_cntr[sleep_stage][0] == 0:
+                print(f"No spikes found for stage {sleep_stage}")
+                pass
         return spk_cntr
     
     def get_sleep_stages_duration(self, eeg_files_ls):
@@ -346,13 +354,24 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
             spike_cumulator_fpath = self.output_path / f"CumulatedSpikes/{eeg_fpath.name.replace(".lay", '_AvgWdwCumulator.pickle')}"
             spk_cum = self.load_spike_cumulator(spike_cumulator_fpath)
             for stage in self.sleep_stages_map.values():
+                # if spk_cntr[stage][0]==0:
+                #     continue
                 for chname in chanels_ls:
                     cum_avg_spike = spk_cum.spike_cum_dict[stage][spk_cum.get_ch_idx(chname)]
                     cum_avg_spike_ampl = np.max(cum_avg_spike)-np.min(cum_avg_spike)
                     nr_spikes_in_avg = spk_cum.spike_counter[stage][0]
-                    spk_amplitude[stage][chname] += (nr_spikes_in_avg/spk_cntr[stage][0])*cum_avg_spike_ampl
+                    # spk_amplitude[stage][chname] += (nr_spikes_in_avg/spk_cntr[stage][0])*cum_avg_spike_ampl
+                    spk_amplitude[stage][chname] += (nr_spikes_in_avg*cum_avg_spike_ampl)
+
                     pass
             pass
+        for stage in self.sleep_stages_map.values():
+            tot_stage_spike_cnt = spk_cntr[stage][0]
+            for chname in chanels_ls:
+                if tot_stage_spike_cnt==0:
+                    print(f"No spikes found for stage {stage}")
+                else:
+                    spk_amplitude[stage][chname] = spk_amplitude[stage][chname]/tot_stage_spike_cnt
         return spk_amplitude
 
 
@@ -369,9 +388,9 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
         avg_spike_by_day_stage_ch_df = pd.DataFrame()
         for day_nr in eeg_filepaths_byday_df.EEG_Day.unique().tolist():
             day_eeg_files_ls = eeg_filepaths_byday_df.EEG_Filepath[eeg_filepaths_byday_df.EEG_Day==day_nr].values.tolist()
+            spk_cntr = self.get_nr_spikes(day_eeg_files_ls)
             sleep_stages_durs = self.get_sleep_stages_duration(day_eeg_files_ls)
             day_spk_amplitude = self.get_spikes_avg_amp(day_eeg_files_ls, chanels_ls)
-            spk_cntr = self.get_nr_spikes(eeg_files_ls)
             nr_chs = len(chanels_ls)
             for stage in sleep_stages_ls:
                 data_df = {'Stage':[stage]*nr_chs, 
@@ -387,56 +406,6 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                 data_df = pd.DataFrame(data_df)
                 avg_spike_by_day_stage_ch_df = pd.concat([avg_spike_by_day_stage_ch_df, data_df], ignore_index=True)
                 pass
-
-
-        # for sleep_stage in sleep_stages_ls:
-        #     days_ls = eeg_filepaths_byday_df.EEG_Day.unique()
-        #     for day in days_ls:
-        #         spike_cumulator_fpath = self.output_path / f"CumulatedSpikes/{eeg_files_ls[0].name.replace(".lay", '_AvgWdwCumulator.pickle')}"
-        #         fs_us = self.load_spike_cumulator(spike_cumulator_fpath).sig_wdw_fs
-        #         day_stage_cum = {ch_name:np.zeros(fs_us) for ch_name in chanels_ls}
-        #         day_stage_cum = {**{'clip_cnt':[0], 'spike_cnt':[0]}, **day_stage_cum}
-                
-        #         day_eeg_files_ls = eeg_filepaths_byday_df.EEG_Filepath[eeg_filepaths_byday_df.EEG_Day==day].values.tolist()
-        #         for eeg_fpath in day_eeg_files_ls:
-        #             #eeg_reader = EEG_IO(eeg_fpath, mtg_t=mtg_t)
-        #             spike_cumulator_fpath = self.output_path / f"CumulatedSpikes/{eeg_fpath.name.replace(".lay", '_AvgWdwCumulator.pickle')}"
-
-        #             if not os.path.isfile(spike_cumulator_fpath):
-        #                 continue
-        #             temp_spk_cum = self.load_spike_cumulator(filepath=spike_cumulator_fpath)
-
-        #             nr_spikes = temp_spk_cum.spike_counter[sleep_stage][0]
-        #             day_stage_cum['clip_cnt'][0] += 1
-        #             day_stage_cum['spike_cnt'][0] += nr_spikes
-        #             for ch_name in chanels_ls:
-        #                 ch_idx = temp_spk_cum.get_ch_idx(ch_name)
-        #                 day_stage_cum[ch_name] += temp_spk_cum.spike_cum_dict[sleep_stage][ch_idx]*nr_spikes
-        #                 pass
-        #             pass
-            
-        #         nr_chs = len(chanels_ls)
-        #         nr_records = day_stage_cum['clip_cnt'][0]
-        #         nr_total_spikes = day_stage_cum['spike_cnt'][0]
-        #         data_df = {'Stage':[sleep_stage]*nr_chs, 'DayNr':[day]*nr_chs, 'NrHourRecords':[nr_records]*nr_chs, 'NrSpikeWdws':[nr_total_spikes]*nr_chs, 'ChName':chanels_ls, 'AvgSpikeAmplitude':[]}
-        #         plot_ok = False
-        #         for ch_name in chanels_ls:
-        #             if nr_total_spikes>0:
-        #                 day_stage_cum[ch_name] /= nr_total_spikes
-        #             data_df['AvgSpikeAmplitude'].append(np.max(day_stage_cum[ch_name])-np.min(day_stage_cum[ch_name]))
-        #             if plot_ok:
-        #                 time_vec = np.arange(len(day_stage_cum[ch_name]))/fs_us
-        #                 plt.plot(time_vec, day_stage_cum[ch_name], '-k', linewidth=1)
-        #                 plt.plot([np.mean(time_vec)]*2, [np.min(day_stage_cum[ch_name]), np.max(day_stage_cum[ch_name])], '--r', linewidth=1)
-        #                 plt.xlim(np.min(time_vec), np.max(time_vec))
-        #                 plt.waitforbuttonpress()
-        #                 plt.close()
-        #         data_df = pd.DataFrame(data_df)
-        #         if len(avg_spike_by_day_stage_ch_df)==0:
-        #             avg_spike_by_day_stage_ch_df = data_df.copy()
-        #         else:
-        #             avg_spike_by_day_stage_ch_df = pd.concat([avg_spike_by_day_stage_ch_df, data_df], ignore_index=True)
-        #         pass
         return avg_spike_by_day_stage_ch_df
                 
 
@@ -553,23 +522,74 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
 
         return avg_spike_by_day_stage_ch_df
 
+    
+    def get_weighted_avg_coordinates_deprecated(self, stage_df):
+
+        chavg_spike_chname = stage_df.ChName.to_numpy()
+        chavg_spike_ampl = self.MinMaxScaler(stage_df.AvgSpikeAmplitude.to_numpy())
+        x_coords = stage_df.x.to_numpy()
+        y_coords = stage_df.y.to_numpy()
+        z_coords = stage_df.z.to_numpy()
+        
+        max_ampl_x = x_coords[np.argmax(chavg_spike_ampl)]
+        max_ampl_y = y_coords[np.argmax(chavg_spike_ampl)]
+        max_ampl_z = z_coords[np.argmax(chavg_spike_ampl)]
+
+        coords_weights = (chavg_spike_ampl/np.max(chavg_spike_ampl))
+        #coords_weights = np.pow(coords_weights,2)
+        #coords_weights = MinMaxScaler().fit_transform(coords_weights.reshape(-1,1)).flatten()
+
+        x_strides = (max_ampl_x-x_coords)*coords_weights
+        avg_x_stride = np.mean(x_strides)
+        final_x = max_ampl_x-avg_x_stride
+
+        y_strides = (max_ampl_y-y_coords)*coords_weights
+        avg_y_stride = np.mean(y_strides)
+        final_y = max_ampl_y-avg_y_stride
+
+        z_strides = (max_ampl_z-z_coords)*coords_weights
+        avg_z_stride = np.mean(z_strides)
+        final_z = max_ampl_z-avg_z_stride
+
+        weighted_x = [int(final_x)]
+        weighted_y = [int(final_y)]
+        weighted_z = [int(final_z)]
+
+        return weighted_x, weighted_y, weighted_z
+
+
+    def get_weighted_avg_coordinates(self, stage_df):
+        x_coords = stage_df.x.to_numpy()
+        y_coords = stage_df.y.to_numpy()
+        z_coords = stage_df.z.to_numpy()
+        weighted_x = np.mean(x_coords)
+        weighted_y = np.mean(y_coords)
+        weighted_z = np.mean(z_coords)
+        if not (stage_df.AvgSpikeAmplitude == 0).all():
+            chavg_spike_ampl = (stage_df.AvgSpikeAmplitude.to_numpy())**3
+            weighted_x = np.round(np.sum(chavg_spike_ampl * x_coords) / np.sum(chavg_spike_ampl))
+            weighted_y = np.round(np.sum(chavg_spike_ampl * y_coords) / np.sum(chavg_spike_ampl))
+            weighted_z = np.round(np.sum(chavg_spike_ampl * z_coords) / np.sum(chavg_spike_ampl))
+
+        return [int(weighted_x)], [int(weighted_y)], [int(weighted_z)]
+
+
     def plot_daily_spike_activity(self):
         spk_df = pd.read_csv(self.output_path / f"{self.pat_id}_AvgSpikeWdwByDay.csv")
         stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
         pat_id = self.pat_id
         days_ls = spk_df.DayNr.unique()
 
-        # Create a 3D scatter plot for each Sleep Stage    
-        fig = make_subplots(
-                    rows=1, cols=5,
-                    horizontal_spacing = 0.01,  vertical_spacing  = 0.1,
-                    subplot_titles=(stages_names_ls),
-                    start_cell="top-left",
-                    specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}]]
-                    )
 
         for di, day in enumerate(days_ls):
-            day=7
+            # Create a 3D scatter plot for each Sleep Stage    
+            fig = make_subplots(
+                        rows=1, cols=5,
+                        horizontal_spacing = 0.01,  vertical_spacing  = 0.1,
+                        subplot_titles=(stages_names_ls),
+                        start_cell="top-left",
+                        specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}]]
+                        )
             day_spk_df = spk_df[spk_df.DayNr==day]
             for ss_idx, stage_name in enumerate(stages_names_ls):
                 stage_df = day_spk_df[day_spk_df.Stage.str.fullmatch(stage_name, case=False)]
@@ -591,48 +611,64 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                             size=10,
                             color=chavg_spike_ampl,
                             colorscale='viridis',
-                            opacity=0.8,
+                            opacity=0.9,
                             showscale=True,
                             cmin=np.min(chavg_spike_ampl),
                             cmax=np.max(chavg_spike_ampl),
                             colorbar=dict(title="Scaled<br>Amplitude"),#, len=0.50, y=0.8),
                         ),
-                        #text=stage_df['Channel'],
                         text=[f"{chname}: {prob:.2f}" for chname, amp, prob in zip(chavg_spike_chname, chavg_spike_ampl, chavg_spike_ampl)],  # Custom text for the fourth dimension
                         hoverinfo='text',
-                        # hovertemplate="X: %{x}<br>Y: %{y}<br>%{text}<extra></extra>"  # Display fourth dimension on hover
                     ),
                     row=1, col=ss_idx+1
                 )
 
                 # Highlight SOZ channels
-                chavg_spike_chname = chavg_spike_chname[stage_df.SOZ.to_numpy()]
-                chavg_spike_ampl = chavg_spike_ampl[stage_df.SOZ.to_numpy()]
-                x_coords = x_coords[stage_df.SOZ.to_numpy()]
-                y_coords = y_coords[stage_df.SOZ.to_numpy()]
-                z_coords = z_coords[stage_df.SOZ.to_numpy()]
+                soz_x_coords = x_coords[stage_df.SOZ.to_numpy()]
+                soz_y_coords = y_coords[stage_df.SOZ.to_numpy()]
+                soz_z_coords = z_coords[stage_df.SOZ.to_numpy()]
                 fig.add_trace(
                     go.Scatter3d(
-                        x = x_coords,
-                        y = y_coords,
-                        z = z_coords,
+                        x = soz_x_coords,
+                        y = soz_y_coords,
+                        z = soz_z_coords,
                         mode='markers',  # Show markers and labels
                         marker=dict(
-                        symbol="circle-open",
-                        size=12,
-                        color='Red',
-                        opacity=1,
-                        showscale=False,
-                        line=dict(color='Red',width=10)
+                            symbol="circle-open",
+                            size=12,
+                            color='Cyan',
+                            opacity=0.9,
+                            showscale=False,
+                            line=dict(color='Cyan',width=10)
+                        ),
+                    ),
+                    row=1, col=ss_idx+1
+                )
+
+                # Amplitude Weighted Virtual Contact 
+                wx, wy, wz = self.get_weighted_avg_coordinates(stage_df)
+                fig.add_trace(
+                    go.Scatter3d(
+                        x = wx,
+                        y = wy,
+                        z = wz,
+                        mode='markers',  # Show markers and labels
+                        marker=dict(
+                            symbol="diamond-open",
+                            size=12,
+                            color='Red',
+                            opacity=1,
+                            showscale=False,
+                            line=dict(color='Red',width=10)
                         ),
                     ),
                     row=1, col=ss_idx+1
                 )
             
 
+            fig.update_layout(autosize=True)
+            #fig.update_layout(autosize=True,width=2048,height=1024)
             fig.update_layout(title_text=f"{pat_id} Day {day}<br>(Avg. Window Amplitude)", showlegend=False)
-
-
             # Define the camera settings
             center_dict = {'x': 0, 'y': 0, 'z': 0}
             eye_dict = {'x': 3, 'y': 3, 'z': 3}
@@ -645,9 +681,11 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
             for i in range(len(stages_names_ls)):
                 fig.update_layout(**{f'scene{i+1}': dict(camera=camera)})
 
-
             fig.show()
-            # fig_fpath = spike_cumulators_path /"Images" / f"Spike_Wdw_Amplitude_{pat_id}.html"
-            # fig.write_html(fig_fpath)
-            pass
+            out_images_path = self.output_path /"Images"
+            os.makedirs(out_images_path, exist_ok=True)
+            fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.html"    
+            fig.write_html(fig_fpath)
+            # fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.jpg" 
+            # fig.write_image(fig_fpath)
         pass
