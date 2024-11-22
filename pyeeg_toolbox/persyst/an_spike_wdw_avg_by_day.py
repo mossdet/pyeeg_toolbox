@@ -4,13 +4,13 @@ import numpy as np
 import pickle
 import matplotlib.pyplot as plt
 import sys
+import plotly.graph_objects as go
 
+from plotly.subplots import make_subplots
 from joblib import Parallel, delayed
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
 from typing import Dict
 from pyeeg_toolbox.persyst.avg_wdw_cumulator import AvgWdwCumulator
 from pyeeg_toolbox.eeg_io.eeg_io import EEG_IO
@@ -566,7 +566,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
         weighted_y = np.mean(y_coords)
         weighted_z = np.mean(z_coords)
         if not (stage_df.AvgSpikeAmplitude == 0).all():
-            chavg_spike_ampl = (stage_df.AvgSpikeAmplitude.to_numpy())**3
+            chavg_spike_ampl = (stage_df.AvgSpikeAmplitude.to_numpy())**2
             weighted_x = np.round(np.sum(chavg_spike_ampl * x_coords) / np.sum(chavg_spike_ampl))
             weighted_y = np.round(np.sum(chavg_spike_ampl * y_coords) / np.sum(chavg_spike_ampl))
             weighted_z = np.round(np.sum(chavg_spike_ampl * z_coords) / np.sum(chavg_spike_ampl))
@@ -588,7 +588,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                         horizontal_spacing = 0.01,  vertical_spacing  = 0.1,
                         subplot_titles=(stages_names_ls),
                         start_cell="top-left",
-                        specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}]]
+                        specs=[[{"type": "scatter3d"}, {"type": "scatter3d"}, {"type": "scatter3d"}, {"type": "scatter3d"}, {"type": "scatter3d"}]]
                         )
             day_spk_df = spk_df[spk_df.DayNr==day]
             for ss_idx, stage_name in enumerate(stages_names_ls):
@@ -686,6 +686,9 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
             os.makedirs(out_images_path, exist_ok=True)
             fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.html"    
             fig.write_html(fig_fpath)
-            # fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.jpg" 
-            # fig.write_image(fig_fpath)
-        pass
+            fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.jpg" 
+            fig.write_image(fig_fpath)
+            pass
+    pass
+
+
