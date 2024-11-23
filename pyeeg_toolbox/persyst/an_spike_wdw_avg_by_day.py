@@ -5,6 +5,7 @@ import pickle
 import matplotlib.pyplot as plt
 import sys
 import plotly.graph_objects as go
+import plotly.colors
 
 from plotly.subplots import make_subplots
 from joblib import Parallel, delayed
@@ -18,6 +19,8 @@ from scipy.signal import find_peaks, peak_prominences
 from studies_info import fr_four_patients
 from pyeeg_toolbox.persyst.an_avg_spike_amplitude import SpikeAmplitudeAnalyzer
 from pyeeg_toolbox.utils.convert_mapped_channels import correct_1096_chnames
+from statsmodels.stats.multivariate import test_mvmean_2indep
+from hotelling.stats import hotelling_t2
 
 # Workaround for Kaleido on Windows, without this the Kaleido executable is not found when saving as .png or .jpg
 if sys.platform.startswith('win'):
@@ -566,7 +569,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
         weighted_y = np.mean(y_coords)
         weighted_z = np.mean(z_coords)
         if not (stage_df.AvgSpikeAmplitude == 0).all():
-            chavg_spike_ampl = (stage_df.AvgSpikeAmplitude.to_numpy())**2
+            chavg_spike_ampl = (stage_df.AvgSpikeAmplitude.to_numpy())**1
             weighted_x = np.round(np.sum(chavg_spike_ampl * x_coords) / np.sum(chavg_spike_ampl))
             weighted_y = np.round(np.sum(chavg_spike_ampl * y_coords) / np.sum(chavg_spike_ampl))
             weighted_z = np.round(np.sum(chavg_spike_ampl * z_coords) / np.sum(chavg_spike_ampl))
@@ -588,7 +591,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                         horizontal_spacing = 0.01,  vertical_spacing  = 0.1,
                         subplot_titles=(stages_names_ls),
                         start_cell="top-left",
-                        specs=[[{"type": "scatter3d"}, {"type": "scatter3d"}, {"type": "scatter3d"}, {"type": "scatter3d"}, {"type": "scatter3d"}]]
+                        specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}]]
                         )
             day_spk_df = spk_df[spk_df.DayNr==day]
             for ss_idx, stage_name in enumerate(stages_names_ls):
@@ -686,9 +689,212 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
             os.makedirs(out_images_path, exist_ok=True)
             fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.html"    
             fig.write_html(fig_fpath)
+
+            fig.update_layout(autosize=True,width=2048,height=1024)
             fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.jpg" 
             fig.write_image(fig_fpath)
+            #self.add_synch_subplots_jscript(fig, fig_fpath, stages_names_ls)
             pass
-    pass
+        return fig
+
+    def add_synch_subplots_jscript(self, fig, fig_fpath, stages_names_ls):
+        #https://community.plotly.com/t/synchronize-camera-across-3d-subplots/22236/4
+        
+        # Generate the HTML content with embedded JavaScript
+        from plotly.offline import plot
+
+        # Generate the div element containing the figure
+        plot_div = plot(fig, output_type='div', include_plotlyjs='cdn', auto_open=False)
 
 
+        # get the a div
+        div = plot(fig, include_plotlyjs=False, output_type='div')
+        # retrieve the div id (you probably want to do something smarter here with beautifulsoup)
+        div_id = div.split('=')[1].split()[0].replace("'", "").replace('"', '')
+        # your custom JS code
+        sync_camera_js = '''
+            <script>
+            var gd = document.getElementById('{div_id}');
+            var isUnderRelayout = false
+
+            gd.on('plotly_relayout', () => {{
+            console.log('relayout', isUnderRelayout)
+            if (!isUnderRelayout) {{
+                Plotly.relayout(gd, 'scene2.camera', gd.layout.scene.camera)
+                .then(() => {{ isUnderRelayout = false }}  )
+            }}
+
+            isUnderRelayout = true;
+            }})
+            </script>'''
+
+        # Combine the plot div and the synchronization script
+        html_content = f"""
+        <html>
+        <head>
+            <meta charset="utf-8" />
+            <title>Synchronized Scatter3D Subplots</title>
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+        </head>
+        <body>
+            {plot_div}
+            {sync_camera_js}
+        </body>
+        </html>
+        """
+
+        # Save the combined HTML content to a file
+        with open(fig_fpath, 'w') as f:
+            f.write(html_content)
+        pass
+
+
+
+    def get_wavg_coords_by_day(self):
+        spk_df = pd.read_csv(self.output_path / f"{self.pat_id}_AvgSpikeWdwByDay.csv")
+        stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
+        pat_id = self.pat_id
+        days_ls = spk_df.DayNr.unique()
+        wavg_coords = {stage:[] for stage in stages_names_ls}
+        for di, day in enumerate(days_ls):
+            day_spk_df = spk_df[spk_df.DayNr==day]
+            for ss_idx, stage_name in enumerate(stages_names_ls):
+                stage_df = day_spk_df[day_spk_df.Stage.str.fullmatch(stage_name, case=False)]
+                # Amplitude Weighted Virtual Contact 
+                wx, wy, wz = self.get_weighted_avg_coordinates(stage_df)
+                wavg_coords[stage_name].append([wx[0], wy[0], wz[0]])
+                pass
+            pass
+        pass
+
+        test_nr = 1
+        for stg_a in stages_names_ls:
+            for stg_b in stages_names_ls:
+                res = test_mvmean_2indep(np.array(wavg_coords[stg_a]), np.array(wavg_coords[stg_b]))
+                res2 = hotelling_t2(np.array(wavg_coords[stg_a]), np.array(wavg_coords[stg_b]))
+                print(f"{test_nr}.Comparing {stg_a} vs {stg_b}, pvalue = {res.pvalue:.5f}")
+                print(f"{test_nr}.Comparing {stg_a} vs {stg_b}, pvalue = {res2[2]:.5f}\n")
+                test_nr += 1
+                pass
+
+        pass
+
+    def get_daily_centroid_shift(self):
+        spk_df = pd.read_csv(self.output_path / f"{self.pat_id}_AvgSpikeWdwByDay.csv")
+        stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
+        pat_id = self.pat_id
+        days_ls = spk_df.DayNr.unique()
+        dayily_centroid_shifts = {stage:[] for stage in stages_names_ls}
+        all_wavg_coords = np.empty((0, 3), dtype=int)
+        for ss_idx, stage_name in enumerate(stages_names_ls):
+            for di in np.arange(1,len(days_ls)):
+                day_a = days_ls[di-1]
+                day_b = days_ls[di]
+                stage_df_a = spk_df[np.logical_and((spk_df.DayNr==day_a).to_numpy(), (spk_df.Stage.str.fullmatch(stage_name, case=False)).to_numpy())]
+                stage_df_b = spk_df[np.logical_and((spk_df.DayNr==day_b).to_numpy(), (spk_df.Stage.str.fullmatch(stage_name, case=False)).to_numpy())]
+                # Amplitude Weighted Virtual Contact 
+                wx_a, wy_a, wz_a = self.get_weighted_avg_coordinates(stage_df_a)
+                wx_b, wy_b, wz_b = self.get_weighted_avg_coordinates(stage_df_b)
+                point_a = np.array([wx_a[0], wy_a[0], wz_a[0]])
+                point_b = np.array([wx_b[0], wy_b[0], wz_b[0]])
+                dist = np.linalg.norm(np.array(point_a) - np.array(point_b))
+                dist_dlp = np.sqrt(np.sum((np.array(point_a) - np.array(point_b))**2))
+                dayily_centroid_shifts[stage_name].append(dist)
+                all_wavg_coords = np.vstack((all_wavg_coords, point_a))
+                all_wavg_coords = np.vstack((all_wavg_coords, point_b))
+                pass
+            pass
+        pass
+
+    def plot_daily_centroid_shift(self):
+        spk_df = pd.read_csv(self.output_path / f"{self.pat_id}_AvgSpikeWdwByDay.csv")
+        stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
+        pat_id = self.pat_id
+        days_ls = spk_df.DayNr.unique()
+        all_coords = np.empty((0, 3), dtype=int)
+
+        # Create a 3D scatter plot for each Sleep Stage    
+        fig = make_subplots(
+                    rows=1, cols=5,
+                    horizontal_spacing = 0.01,  vertical_spacing  = 0.1,
+                    subplot_titles=(stages_names_ls),
+                    start_cell="top-left",
+                    specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}]]
+                    )
+
+        # Get 5 colors from the 'Viridis' color scale
+        colors = plotly.colors.sample_colorscale('Viridis', [0, 0.25, 0.5, 0.75, 1.0])
+        for ss_idx, stage_name in enumerate(stages_names_ls):
+            # Create the figure
+            color_val = colors[-1]
+            for di in np.arange(1,len(days_ls)):
+                day_a = days_ls[di-1]
+                day_b = days_ls[di]
+                day_spk_df_a = spk_df[spk_df.DayNr==day_a]
+                day_spk_df_b = spk_df[spk_df.DayNr==day_b]
+                stage_df_a = day_spk_df_a[day_spk_df_a.Stage.str.fullmatch(stage_name, case=False)]
+                stage_df_b = day_spk_df_b[day_spk_df_b.Stage.str.fullmatch(stage_name, case=False)]
+
+                # Amplitude Weighted Virtual Contact 
+                wx_a, wy_a, wz_a = self.get_weighted_avg_coordinates(stage_df_a)
+                wx_b, wy_b, wz_b = self.get_weighted_avg_coordinates(stage_df_b)
+                x_diff = wx_b[0] - wx_a[0]
+                y_diff = wy_b[0] - wy_a[0]
+                z_diff = wz_b[0] - wz_a[0]
+                # Define the starting points of the vectors
+                x_start = np.array(wx_a)  # X-coordinates of starting points
+                y_start = np.array(wy_a)  # Y-coordinates of starting points
+                z_start = np.array(wz_a)  # Z-coordinates of starting points
+                # Calculate the end points of the vectors
+                x_end = np.array(x_start) + np.array(x_diff)
+                y_end = np.array(y_start) + np.array(y_diff)
+                z_end = np.array(z_start) + np.array(z_diff)
+
+                all_coords = np.vstack((all_coords, np.array([x_start[0], y_start[0], z_start[0]])))
+                all_coords = np.vstack((all_coords, np.array([x_end[0], y_end[0], z_end[0]])))
+
+                marker_col = color_val
+                marker_specs = dict(size=10, color=color_val, opacity=0.7)
+                if di == 1:
+                    marker_specs = dict(size=[20,10], color=['Green', color_val], opacity=1, line=dict(color=['Green', color_val], width=15))
+                elif di == len(days_ls)-1:
+                   marker_specs = dict(size=[10,20], color=[color_val, 'Red'], opacity=1, line=dict(color=[color_val, 'Red'], width=15))
+
+                # Add the vectors as lines from the starting points to the end points
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[x_start[0], x_end[0]],
+                        y=[y_start[0], y_end[0]],
+                        z=[z_start[0], z_end[0]],
+                        mode='lines+markers',
+                        line=dict(color='Black', width=6),
+                        marker=marker_specs,
+                        name=f'Vector {di}'
+                    ),
+                    row=1, col=ss_idx+1
+                )
+
+        fig.update_layout(autosize=True)
+        fig.update_layout(title_text=f"Daily Displacement of Amplitude-Weighted Spike Centroid<br>{pat_id}", showlegend=False)
+        # Define the camera settings
+        center_dict = {'x': 0, 'y': 0, 'z': 0}
+        eye_dict = {'x': 2, 'y': 2, 'z': 2}
+        projection_dict = {'type': 'perspective'} # perspective, orthographic
+        up_dict = {'x': 0, 'y': 0, 'z': 1}
+        camera = dict(center=center_dict, eye=eye_dict, projection=projection_dict, up=up_dict)
+        for i in range(len(stages_names_ls)):
+            fig.update_layout(**{f'scene{i+1}': dict(camera=camera)})
+
+        alb = 1
+        axis_limits = dict(
+            xaxis=dict(nticks=10, range=[np.min(all_coords[:,0])-alb, np.max(all_coords[:,0])+alb], title='X Axis'),
+            yaxis=dict(nticks=10, range=[np.min(all_coords[:,1])-alb, np.max(all_coords[:,1])+alb], title='Y Axis'),
+            zaxis=dict(nticks=10, range=[np.min(all_coords[:,2])-alb, np.max(all_coords[:,2])+alb], title='Z Axis'),
+            aspectratio=dict(x=1, y=1, z=1)
+        )
+
+        for i in range(len(stages_names_ls)):
+            fig.update_layout(**{f'scene{i+1}': axis_limits})
+            
+        fig.show()
+        pass
