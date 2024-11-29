@@ -620,7 +620,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                             cmax=np.max(chavg_spike_ampl),
                             colorbar=dict(title="Scaled<br>Amplitude"),#, len=0.50, y=0.8),
                         ),
-                        text=[f"{chname}: {prob:.2f}" for chname, amp, prob in zip(chavg_spike_chname, chavg_spike_ampl, chavg_spike_ampl)],  # Custom text for the fourth dimension
+                        text=[f"{chname}: {amp:.2f}" for chname, amp in zip(chavg_spike_chname, chavg_spike_ampl)],  # Custom text for the fourth dimension
                         hoverinfo='text',
                     ),
                     row=1, col=ss_idx+1
@@ -685,7 +685,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                 fig.update_layout(**{f'scene{i+1}': dict(camera=camera)})
 
             fig.show()
-            out_images_path = self.output_path /"Images"
+            out_images_path = self.output_path /"Images/SpkAmpWAvg_Contact_ByDay"
             os.makedirs(out_images_path, exist_ok=True)
             fig_fpath = out_images_path / f"{pat_id}_Day{day}_Spk_Amp_wAvg_Cntct_Coord.html"    
             fig.write_html(fig_fpath)
@@ -797,14 +797,26 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                 wx_b, wy_b, wz_b = self.get_weighted_avg_coordinates(stage_df_b)
                 point_a = np.array([wx_a[0], wy_a[0], wz_a[0]])
                 point_b = np.array([wx_b[0], wy_b[0], wz_b[0]])
-                dist = np.linalg.norm(np.array(point_a) - np.array(point_b))
-                dist_dlp = np.sqrt(np.sum((np.array(point_a) - np.array(point_b))**2))
+                diff_vec = np.array(point_a) - np.array(point_b)
+                dist = np.linalg.norm(diff_vec)
+                dist_dlp = np.sqrt(np.sum((np.array(point_b) - np.array(point_a))**2))
                 dayily_centroid_shifts[stage_name].append(dist)
                 all_wavg_coords = np.vstack((all_wavg_coords, point_a))
                 all_wavg_coords = np.vstack((all_wavg_coords, point_b))
                 pass
             pass
         pass
+
+        return dayily_centroid_shifts
+    
+    def analyze_daily_centroid_shifts(self, dayily_centroid_shifts):
+        stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
+        for ss_idx, stage_name in enumerate(stages_names_ls):
+            dayily_centroid_shifts[stage_name]
+            pass
+        pass
+    
+        return dayily_centroid_shifts
 
     def plot_daily_centroid_shift(self):
         spk_df = pd.read_csv(self.output_path / f"{self.pat_id}_AvgSpikeWdwByDay.csv")
@@ -825,6 +837,153 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
         # Get 5 colors from the 'Viridis' color scale
         colors = plotly.colors.sample_colorscale('Viridis', [0, 0.25, 0.5, 0.75, 1.0])
         for ss_idx, stage_name in enumerate(stages_names_ls):
+                            
+            # Create the figure
+            color_val = colors[-1]
+            for di in np.arange(1,len(days_ls)):
+                day_a = days_ls[di-1]
+                day_b = days_ls[di]
+                day_spk_df_a = spk_df[spk_df.DayNr==day_a]
+                day_spk_df_b = spk_df[spk_df.DayNr==day_b]
+                stage_df_a = day_spk_df_a[day_spk_df_a.Stage.str.fullmatch(stage_name, case=False)]
+                stage_df_b = day_spk_df_b[day_spk_df_b.Stage.str.fullmatch(stage_name, case=False)]
+
+                # Amplitude Weighted Virtual Contact 
+                wx_a, wy_a, wz_a = self.get_weighted_avg_coordinates(stage_df_a)
+                wx_b, wy_b, wz_b = self.get_weighted_avg_coordinates(stage_df_b)
+                x_diff = wx_b[0] - wx_a[0]
+                y_diff = wy_b[0] - wy_a[0]
+                z_diff = wz_b[0] - wz_a[0]
+                diff_norm = np.linalg.norm(np.array([x_diff,y_diff,z_diff]))
+                
+                point_a = np.array([wx_a[0], wy_a[0], wz_a[0]])
+                point_b = np.array([wx_b[0], wy_b[0], wz_b[0]])
+                diff_norm = np.sqrt(np.sum((np.array(point_b) - np.array(point_a))**2))
+
+                print(f"Start: {point_a}\n  End: {point_b}\n Diff: {diff_norm:.2f}")
+
+                # Define the starting points of the vectors
+                x_start = np.array(wx_a)  # X-coordinates of starting points
+                y_start = np.array(wy_a)  # Y-coordinates of starting points
+                z_start = np.array(wz_a)  # Z-coordinates of starting points
+                # Define the end points of the vectors
+                x_end = np.array(wx_b)  # X-coordinates of starting points
+                y_end = np.array(wy_b)  # Y-coordinates of starting points
+                z_end = np.array(wz_b)  # Z-coordinates of starting points
+
+                all_coords = np.vstack((all_coords, np.array([x_start[0], y_start[0], z_start[0]])))
+                all_coords = np.vstack((all_coords, np.array([x_end[0], y_end[0], z_end[0]])))
+
+                hovertext = f"d{days_ls[di-1]}->d{days_ls[di]}, Start:{point_a}, End:{point_b}, Diff:{diff_norm:.2f}"
+
+                marker_col = color_val
+                marker_specs = dict(size=10, color=color_val, opacity=0.7)
+                if di == 1:
+                    marker_specs = dict(size=[20,10], color=['Green', color_val], opacity=1, line=dict(color=['Green', color_val], width=15))
+                elif di == len(days_ls)-1:
+                   marker_specs = dict(size=[10,20], color=[color_val, 'Red'], opacity=1, line=dict(color=[color_val, 'Red'], width=15))
+
+                # Add the vectors as lines from the starting points to the end points
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=[x_start[0], x_end[0]],
+                        y=[y_start[0], y_end[0]],
+                        z=[z_start[0], z_end[0]],
+                        mode='lines+markers',
+                        line=dict(color='Black', width=6),
+                        marker=marker_specs,
+                        name=f'Vector {di}',
+                        text=hovertext,
+                        hoverinfo='text',
+                    ),
+                    row=1, col=ss_idx+1
+                )
+
+        fig.update_layout(autosize=True)
+        fig.update_layout(title_text=f"Daily Displacement of Amplitude-Weighted Spike Centroid<br>{pat_id}", showlegend=False)
+        # Define the camera settings
+        center_dict = {'x': 0, 'y': 0, 'z': 0}
+        eye_dict = {'x': 2, 'y': 2, 'z': 2}
+        projection_dict = {'type': 'perspective'} # perspective, orthographic
+        up_dict = {'x': 0, 'y': 0, 'z': 1}
+        camera = dict(center=center_dict, eye=eye_dict, projection=projection_dict, up=up_dict)
+        for i in range(len(stages_names_ls)):
+            fig.update_layout(**{f'scene{i+1}': dict(camera=camera)})
+
+        alb = 1
+        axis_limits = dict(
+            xaxis=dict(nticks=10, range=[np.min(all_coords[:,0])-alb, np.max(all_coords[:,0])+alb], title='X Axis'),
+            yaxis=dict(nticks=10, range=[np.min(all_coords[:,1])-alb, np.max(all_coords[:,1])+alb], title='Y Axis'),
+            zaxis=dict(nticks=10, range=[np.min(all_coords[:,2])-alb, np.max(all_coords[:,2])+alb], title='Z Axis'),
+            aspectratio=dict(x=1, y=1, z=1)
+        )
+
+        for i in range(len(stages_names_ls)):
+            fig.update_layout(**{f'scene{i+1}': axis_limits})
+            
+        fig.show()
+        out_images_path = self.output_path /"Images/Trajectory/"
+        os.makedirs(out_images_path, exist_ok=True)
+        fig_fpath = out_images_path / f"{pat_id}_AllDays_SpkAmp_wAvgCntct_Trajectory.html"    
+        fig.write_html(fig_fpath)
+
+        fig.update_layout(autosize=True,width=2048,height=1024)
+        fig_fpath = out_images_path / f"{pat_id}_AllDays_SpkAmp_wAvgCntct_Trajectory.jpg"
+        fig.write_image(fig_fpath)
+        pass
+
+
+    def plot_daily_centroid_shift_with_SOZ(self):
+        spk_df = pd.read_csv(self.output_path / f"{self.pat_id}_AvgSpikeWdwByDay.csv")
+        stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
+        pat_id = self.pat_id
+        days_ls = spk_df.DayNr.unique()
+        all_coords = np.empty((0, 3), dtype=int)
+
+        # Create a 3D scatter plot for each Sleep Stage    
+        fig = make_subplots(
+                    rows=1, cols=5,
+                    horizontal_spacing = 0.01,  vertical_spacing  = 0.1,
+                    subplot_titles=(stages_names_ls),
+                    start_cell="top-left",
+                    specs=[[{"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}, {"type": "scene"}]]
+                    )
+        
+        x_coords = spk_df.loc[np.logical_and(spk_df.DayNr==1, spk_df.Stage.str.fullmatch('N1', case=False)), 'x'].to_numpy()
+        y_coords = spk_df.loc[np.logical_and(spk_df.DayNr==1, spk_df.Stage.str.fullmatch('N1', case=False)), 'y'].to_numpy()
+        z_coords = spk_df.loc[np.logical_and(spk_df.DayNr==1, spk_df.Stage.str.fullmatch('N1', case=False)), 'z'].to_numpy()
+
+        soz_x_coords = spk_df.loc[np.logical_and.reduce((spk_df.SOZ, spk_df.DayNr==1, spk_df.Stage.str.fullmatch('N1', case=False))), 'x'].to_numpy()
+        soz_y_coords = spk_df.loc[np.logical_and.reduce((spk_df.SOZ, spk_df.DayNr==1, spk_df.Stage.str.fullmatch('N1', case=False))), 'y'].to_numpy()
+        soz_z_coords = spk_df.loc[np.logical_and.reduce((spk_df.SOZ, spk_df.DayNr==1, spk_df.Stage.str.fullmatch('N1', case=False))), 'z'].to_numpy()
+        all_coords = np.vstack((all_coords, np.vstack((x_coords, y_coords, z_coords)).transpose()))
+
+        assert len(x_coords)>0, "No coordinates found for the first day"
+        assert len(x_coords) == len(spk_df.ChName.unique()), "Coordinates and channels mismatch"
+
+        # Get 5 colors from the 'Viridis' color scale
+        colors = plotly.colors.sample_colorscale('Viridis', [0, 0.25, 0.5, 0.75, 1.0])
+        for ss_idx, stage_name in enumerate(stages_names_ls):
+
+            # All contacts
+            fig.add_trace(
+                go.Scatter3d(
+                    x = x_coords, y = y_coords, z = z_coords,
+                    mode='markers',  # Show markers and labels
+                    marker=dict(symbol="circle-open", size=10, color='blue', opacity=0.9, showscale=False, line=dict(color='blue',width=10)),
+                ),
+                row=1, col=ss_idx+1
+            )
+            # SOZ contacts
+            fig.add_trace(
+                go.Scatter3d(
+                    x = soz_x_coords, y = soz_y_coords, z = soz_z_coords,
+                    mode='markers',  # Show markers and labels
+                    marker=dict(symbol="circle", size=10, color='orange', opacity=1, showscale=False, line=dict(color='orange',width=10)),
+                ),
+                row=1, col=ss_idx+1
+            )
+                            
             # Create the figure
             color_val = colors[-1]
             for di in np.arange(1,len(days_ls)):
@@ -854,6 +1013,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
                 all_coords = np.vstack((all_coords, np.array([x_end[0], y_end[0], z_end[0]])))
 
                 marker_col = color_val
+                color_val = 'lightblue'
                 marker_specs = dict(size=10, color=color_val, opacity=0.7)
                 if di == 1:
                     marker_specs = dict(size=[20,10], color=['Green', color_val], opacity=1, line=dict(color=['Green', color_val], width=15))
@@ -897,4 +1057,12 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
             fig.update_layout(**{f'scene{i+1}': axis_limits})
             
         fig.show()
+        out_images_path = self.output_path /"Images/Trajectory_plus_SOZ/"
+        os.makedirs(out_images_path, exist_ok=True)
+        fig_fpath = out_images_path / f"{pat_id}_AllDays_SpkAmp_wAvgCntct_Trajectory_plus_SOZ.html"    
+        fig.write_html(fig_fpath)
+
+        fig.update_layout(autosize=True,width=2048,height=1024)
+        fig_fpath = out_images_path / f"{pat_id}_AllDays_SpkAmp_wAvgCntct_Trajectory_plus_SOZ.jpg"
+        fig.write_image(fig_fpath)
         pass

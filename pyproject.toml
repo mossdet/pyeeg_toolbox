@@ -20,6 +20,7 @@ kaleido = "0.1.0"
 pyqt6 = "^6.7.1"
 statsmodels = "^0.14.4"
 hotelling = "^0.5.0"
+jupyterlab = "^4.3.1"
 
 
 [tool.poetry.group.dev.dependencies]
