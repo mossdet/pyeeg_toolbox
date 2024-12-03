@@ -99,18 +99,27 @@ for pat_id in study_info.patients.keys():
     #spike_amplitude_analyzer.plot_daily_centroid_shift()
     dayily_centroid_shifts = spike_amplitude_analyzer.get_daily_centroid_shift()
     
-    pat_days_max = np.max(list(dayily_centroid_shifts.values()))
-    pat_days_min = np.min(list(dayily_centroid_shifts.values()))
-    for k in dayily_centroid_shifts.keys():
-        for v in dayily_centroid_shifts[k]:
-            #v = (v - pat_days_min) / (pat_days_max - pat_days_min)
-            all_pats_dayily_centroid_shifts[k].append(v)        
-        pass 
+    # Get max and min shift values
+    stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
+    pat_days_max = 0
+    pat_days_min = 1_000_000
+    for stage_name in stages_names_ls:
+        if np.max(dayily_centroid_shifts[stage_name]) > pat_days_max:
+            pat_days_max = np.max(dayily_centroid_shifts[stage_name])
+        if np.min(dayily_centroid_shifts[stage_name]) < pat_days_min:
+            pat_days_min = np.min(dayily_centroid_shifts[stage_name])
 
+    all_pats_dayily_centroid_shifts['PatID'].extend([pat_id]*len(dayily_centroid_shifts['day_nr']))
+    all_pats_dayily_centroid_shifts['DayNr'].extend(dayily_centroid_shifts['day_nr'])
+    # MinMax Scale the centroid shifts
+    for stage_name in stages_names_ls:
+        #dayily_centroid_shifts[stage_name] = (dayily_centroid_shifts[stage_name]-pat_days_min)/(pat_days_max-pat_days_min)
+        all_pats_dayily_centroid_shifts[stage_name].extend(dayily_centroid_shifts[stage_name])
 all_pats_dayily_centroid_shifts_df = pd.DataFrame(all_pats_dayily_centroid_shifts)
-all_pats_dayily_centroid_shifts_df.to_csv(output_path / "All_pats_dayily_centroid_shifts.csv")
+
+all_pats_dayily_centroid_shifts_df.to_csv(output_path / "All_pats_dayily_centroid_shifts.csv", index=False)
 #sns.violinplot(data=all_pats_spk_displacement_df[['N3','N2','N1','REM','Wake']])
-sns.boxplot(data=all_pats_dayily_centroid_shifts_df[['N3','N2','N1','REM','Wake']])
-plt.waitforbuttonpress()
-plt.close()
+# sns.boxplot(data=all_pats_dayily_centroid_shifts_df[['N3','N2','N1','REM','Wake']])
+# plt.waitforbuttonpress()
+# plt.close()
 pass

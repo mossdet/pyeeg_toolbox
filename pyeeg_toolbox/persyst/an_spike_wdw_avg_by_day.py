@@ -569,7 +569,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
         weighted_y = np.mean(y_coords)
         weighted_z = np.mean(z_coords)
         if not (stage_df.AvgSpikeAmplitude == 0).all():
-            chavg_spike_ampl = (stage_df.AvgSpikeAmplitude.to_numpy())**1
+            chavg_spike_ampl = np.power(stage_df.AvgSpikeAmplitude.to_numpy(), np.e)
             weighted_x = np.round(np.sum(chavg_spike_ampl * x_coords) / np.sum(chavg_spike_ampl))
             weighted_y = np.round(np.sum(chavg_spike_ampl * y_coords) / np.sum(chavg_spike_ampl))
             weighted_z = np.round(np.sum(chavg_spike_ampl * z_coords) / np.sum(chavg_spike_ampl))
@@ -785,6 +785,7 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
         pat_id = self.pat_id
         days_ls = spk_df.DayNr.unique()
         dayily_centroid_shifts = {stage:[] for stage in stages_names_ls}
+        dayily_centroid_shifts = {'day_nr':[f"{di-1}->{di}" for di in np.arange(1,len(days_ls))], **dayily_centroid_shifts}
         all_wavg_coords = np.empty((0, 3), dtype=int)
         for ss_idx, stage_name in enumerate(stages_names_ls):
             for di in np.arange(1,len(days_ls)):
@@ -809,15 +810,6 @@ class DailySpikeWdwAnalyzer(SpikeAmplitudeAnalyzer):
 
         return dayily_centroid_shifts
     
-    def analyze_daily_centroid_shifts(self, dayily_centroid_shifts):
-        stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
-        for ss_idx, stage_name in enumerate(stages_names_ls):
-            dayily_centroid_shifts[stage_name]
-            pass
-        pass
-    
-        return dayily_centroid_shifts
-
     def plot_daily_centroid_shift(self):
         spk_df = pd.read_csv(self.output_path / f"{self.pat_id}_AvgSpikeWdwByDay.csv")
         stages_names_ls = ['N3', 'N2', 'N1', 'REM', 'Wake']
